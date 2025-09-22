@@ -109,7 +109,7 @@ resource "aws_iam_role_policy_attachment" "attach_policy_cloudwatch" {
 # Archive a single file.
 data "archive_file" "zip_lambda" {
   type        = "zip"
-  source_file = "${path.module}/push_data.py"
+  source_file = "${path.module}/../lambda_functions/push_data.py"
   output_path = "${path.module}/pushDataFunction.zip"
 }
 
@@ -138,89 +138,10 @@ resource "aws_lambda_function" "process_s3_files" {
 
 
 
-## Some checkings
-/*
-output "sqs_queue_url" {
-  description = "The URL of the SQS queue"
-  value       = aws_sqs_queue.terraform_queue.id
-}
-
-output "sqs_queue_arn" {
-  description = "The ARN of the SQS queue"
-  value       = aws_sqs_queue.terraform_queue.arn
-}
-
-output "lambda_environment" {
-  description = "Environment variables for the Lambda"
-  value       = aws_lambda_function.process_s3_files.environment
-}
-*/
-
-##===================================================================
-## LAMBDA FUNCTION TO PULL THE DATA FROM THE SAS QUEUE AND CONVERT CSV TO PARQUET
-##===================================================================
-/*
-# Creating a role for the lambda function
-resource "aws_iam_role" "lambda_pull" {
-  name = "pull_data"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "lambda.amazonaws.com"
-        }
-      },
-    ]
-  })
-}
-
-
-resource "aws_iam_policy" "lambda_s3_put_policy" {
-  name        = "lambda-s3-put-policy"
-  description = "Allow Lambda to read from S3 bucket"
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action   = ["s3:PutObject", "s3:GetObject"],
-        Effect   = "Allow",
-        Resource = "${aws_s3_bucket.tf_bucket_2.arn}/*"
-      }
-    ]
-  })
-}
-
-resource "aws_iam_policy" "lambda_sqs_pull_policy" {
-  name        = "lambda-sqs-pull-policy"
-  description = "Allow Lambda to pull messages from SQS queue"
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action   = [  
-                      "sqs:ReceiveMessage",
-                      "sqs:DeleteMessage",
-                      "sqs:GetQueueAttributes",
-                      "logs:CreateLogGroup",
-                      "logs:CreateLogStream",
-                      "logs:PutLogEvents"
-                    ],
-        Effect   = "Allow",
-        Resource = "${aws_sqs_queue.terraform_queue.arn}"
-      }
-    ]
-  })
-}
-
-*/
-
 # Archive a single file.
 data "archive_file" "zip_lambda2" {
   type        = "zip"
-  source_file = "${path.module}/pull_data.py"
+  source_file = "${path.module}/../lambda_functions/pull_data.py"
   output_path = "${path.module}/pullDataFunction.zip"
 }
 
