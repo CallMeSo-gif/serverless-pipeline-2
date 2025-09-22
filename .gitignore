@@ -1,0 +1,12 @@
+.venv
+terraform/.terraform
+terraform/.terraform.lock.hcl
+terraform/.terraform.tfstate.backup
+terraform/terraform.tfstate
+
+# Local csv files
+fichier.csv
+nouveau.csv
+
+# Python cache
+__pycache__/
