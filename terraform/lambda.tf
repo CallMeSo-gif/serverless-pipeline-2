@@ -118,7 +118,7 @@ resource "aws_lambda_function" "process_s3_files" {
   function_name = var.lambdaA
   role          = aws_iam_role.lambda_exec.arn
   handler       = "push_data.lambda_handler"
-  runtime       = "python3.10"
+  runtime       = "python3.13"
   filename      = data.archive_file.zip_lambda.output_path 
 
   # Redeploy the lambda if the index.py file changes
@@ -152,7 +152,7 @@ resource "aws_lambda_function" "csv_to_parquet" {
   function_name = var.lambdaB
   role          = aws_iam_role.lambda_exec.arn
   handler       = "pull_data.lambda_handler"
-  runtime       = "python3.10"
+  runtime       = "python3.13"
   filename      = data.archive_file.zip_lambda2.output_path 
   memory_size = 250
   timeout = 10
