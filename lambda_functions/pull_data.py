@@ -1,11 +1,11 @@
 
 import boto3
 import os
-import pandas as pd
-import io 
-import json
 import awswrangler as wr
-#region = os.environ.get("AWS_REGION", "eu-west-3")
+import logging
+logger = logging.getLogger(__name__)
+# New version add logger to replace print statements
+
  
 # Initialize AWS clients
 s3_client = boto3.client("s3") #, region_name=region)
@@ -20,39 +20,27 @@ def lambda_handler(event, Context):
     """
     Function to pull messages from the SQS queue, modify and send to an S3 bucket.
     """
-    if not QUEUE_URL:
-        raise ValueError("QUEUE_URL environment variable is missing")
 
-    print(f"Target bucket: {TARGET_BUCKET}")
+    logger.info(f"TARGET_BUCKET: {TARGET_BUCKET}")
     try:
         response = sqs_client.receive_message(
             QueueUrl=QUEUE_URL,
-            MaxNumberOfMessages=10,
-            WaitTimeSeconds=5
+            MaxNumberOfMessages=5
         )
 
         messages = response.get('Messages', [])
+        logger.info(f"Received {len(messages)} messages from SQS")
         if not messages:
-            print("No messages in SQS, exiting.")
+            logger.info("No messages to process.")
             return  # Nothing to process
         
 
         for message in messages:
-
             my_path = message["Body"]
-        
-            bucket = my_path.split("/")[2]
-            key = "/".join(my_path.split("/")[3:])
-
-         
-
-            # 1️ Read the CSV file from S3 into a DataFrame
-            obj = s3_client.get_object(Bucket=bucket, Key=key) # returns a dict
-            body = obj["Body"].read() # read all data in the file -> it gives bytes
-
             
-            df = pd.read_csv(io.BytesIO(body)) # read the csv file in a dataframe
-
+            key = "/".join(my_path.split("/")[3:])
+            df = wr.s3.read_csv(my_path)
+            logger.info(f"Read {len(df)} rows from {my_path}")
            
             # 2️ Add a new column
             df["salaire_annuel_eur"] = df["salaire"].str.replace("K", "").astype(int) * 1000 
@@ -61,11 +49,12 @@ def lambda_handler(event, Context):
            
             file_name = key.split("/")[-1].replace(".csv", ".parquet")
             output_path = f"s3://{TARGET_BUCKET}/processed/{file_name}"
-        
+
+            logger.info(f"Writing to parquet :  {output_path}")
             wr.s3.to_parquet(
                 df=df,
                 path=output_path,
-                dataset=False,  # write a single file
+                dataset=False,
                 index=False
             )
             
@@ -75,13 +64,10 @@ def lambda_handler(event, Context):
                 QueueUrl=QUEUE_URL,
                 ReceiptHandle=message['ReceiptHandle']
             )
-            print(f"Deleted message: {message['MessageId']}")
+            logger.info(f"Deleted message from SQS: {message['MessageId']}")
             
 
-        if not messages:
-            print("No messages in the queue.")
-
     except Exception as e:
-        print(f"Error : {str(e)}")
+        logger.error(f"Error processing messages: {str(e)}")
 
 

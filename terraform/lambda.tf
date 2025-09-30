@@ -113,8 +113,11 @@ data "archive_file" "zip_lambda" {
   output_path = "${path.module}/pushDataFunction.zip"
 }
 
+
+
 # Create the Lambda function
 resource "aws_lambda_function" "process_s3_files" {
+ 
   function_name = var.lambdaA
   role          = aws_iam_role.lambda_exec.arn
   handler       = "push_data.lambda_handler"
@@ -169,7 +172,7 @@ resource "aws_lambda_function" "csv_to_parquet" {
   }
 
   layers = [
-            "arn:aws:lambda:eu-west-3:183295454956:layer:aws-data-wrangler:1"
+            "arn:aws:lambda:eu-west-3:183295454956:layer:aws-data-wrangler:2"
           ] 
 
 
