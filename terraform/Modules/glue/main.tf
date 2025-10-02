@@ -106,23 +106,38 @@ resource "aws_glue_catalog_table" "parquet-table" {
     "parquet.compression" = "SNAPPY"
   }
 
-/*
-  # Only useful for Athena, not really for Glue Crawler. So I'll give up.
+# Define the schema of the table
   storage_descriptor {
-    location      = "s3://my-bucket/event-streams/my-stream"
+    location      = "s3://${var.s3_bucket2}/processed/"
     input_format  = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
     output_format = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
-
+    #ser_de = serialization / deserialization
     ser_de_info {
-      name                  = "my-stream"
       serialization_library = "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
 
       parameters = {
         "serialization.format" = 1
       }
     }
+
+    columns {
+      name = "departement"
+      type = "string"
+    } 
+    columns {
+      name = "role"
+      type = "string"
+    }
+    columns {
+      name = "salaire"
+      type = "string"
+    }
+    columns {
+      name = "salaire_annuel_eur"
+      type = "int"
+    }
   }
-  */
+    
 }
 
 
@@ -134,10 +149,16 @@ resource "aws_glue_crawler" "parquet-crawler" {
   description   = "Crawler for parquet files in the S3 bucket"
 
   s3_target {
-    path = var.s3_bucket2
+    path = "s3://${var.s3_bucket2}/processed/"
   }
 
-  table_prefix = "parquet_"
+  ## I would enforce the schema and I don't want the crawler to modify it.
+  ## So I set both update and delete behavior to LOG
+  schema_change_policy {
+  update_behavior = "LOG"
+  delete_behavior = "LOG"
+}
+
 }
 
 
