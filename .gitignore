@@ -1,7 +1,7 @@
 .venv
 terraform/.terraform
 terraform/.terraform.lock.hcl
-terraform/.terraform.tfstate.backup
+terraform/terraform.tfstate.backup
 terraform/terraform.tfstate
 terraform/pushDataFunction.zip
 terraform/pullDataFunction.zip
