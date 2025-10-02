@@ -68,16 +68,7 @@ resource "aws_iam_role_policy_attachment" "example-attach" {
 }
 
 
-/*
 
-
-resource "aws_s3_object" "glue_etl_script" {
-  bucket = aws_s3_bucket.aws_glue_job.id
-  key    = "jobs/etl_job.py"
-  source = "jobs/etl_job.py" # Make sure this file exists locally
-}
-
-*/
 
 # Create a Glue Catalog Database
 resource "aws_glue_catalog_database" "parquet-db" {
@@ -200,5 +191,32 @@ resource "aws_glue_job" "etl_job" {
     "Description" = "Activite 3 avec Glue",
     "Workers"     = "2",
     "Type"        = "G.1X"
+  }
+}
+
+# IAM Role for Glue Crawler
+resource "aws_iam_role" "athena-role" { 
+  name = var.athena_role_name
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "athena.amazonaws.com"
+        }
+      },
+    ]
+  })
+}
+
+#  Sufficient permission  for Athena to read the Glue table
+resource "aws_lakeformation_permissions" "this" {
+  principal   = aws_iam_role.glue-role.arn
+  permissions = ["SELECT", "ALTER", "INSERT", "DESCRIBE"]
+
+  database {
+    name          = var.database_name
   }
 }
