@@ -73,7 +73,7 @@ resource "aws_iam_policy" "lambda_policy" {
 resource "aws_lambda_permission" "allow_s3" {
   statement_id  = "AllowS3Invoke"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.process_s3_files.function_name
+  function_name = module.lambda_function.lambda_function_name
   principal     = "s3.amazonaws.com"
   source_arn    = aws_s3_bucket.tf_bucket.arn
 }
@@ -82,7 +82,7 @@ resource "aws_s3_bucket_notification" "bucket_notification" {
   bucket = aws_s3_bucket.tf_bucket.id
 
   lambda_function {
-    lambda_function_arn = aws_lambda_function.process_s3_files.arn
+    lambda_function_arn = module.lambda_function.lambda_function_arn
     events              = ["s3:ObjectCreated:*"]  
     filter_prefix       = "to_process/"          
   }
@@ -104,7 +104,7 @@ resource "aws_iam_role_policy_attachment" "attach_policy_cloudwatch" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-
+/*
 
 # Archive a single file.
 data "archive_file" "zip_lambda" {
@@ -113,8 +113,32 @@ data "archive_file" "zip_lambda" {
   output_path = "${path.module}/pushDataFunction.zip"
 }
 
+*/
+
+module "lambda_function" {
+  source  = "terraform-aws-modules/lambda/aws"
+  version = "~> 6.0"
+
+  function_name = var.lambdaA
+  description   = "Sends S3 file info to SQS"
+  handler       = "push_data.lambda_handler"
+  runtime       = "python3.13"
+  timeout       = 300
+  memory_size   = 1024
+
+  source_path = "${path.module}/../lambda_functions/push_data"  # Folder containing your main.py
+
+  environment_variables = {
+    QUEUE_URL   = aws_sqs_queue.terraform_queue.id
+  }
+
+  attach_policy_json = false
+  # On utilise le rôle existant
+  lambda_role = aws_iam_role.lambda_exec.arn
+}
 
 
+/*
 # Create the Lambda function
 resource "aws_lambda_function" "process_s3_files" {
  
@@ -177,6 +201,31 @@ resource "aws_lambda_function" "csv_to_parquet" {
 
 
 }
+*/
+module "lambda_function_2" {
+  source  = "terraform-aws-modules/lambda/aws"
+  version = "~> 6.0"
+
+  function_name = var.lambdaB
+  description   = "Reads from SQS, converts CSV to Parquet, and uploads to S3"
+  handler       = "pull_data.lambda_handler"
+  runtime       = "python3.13"
+  timeout       = 300
+  memory_size   = 1024
+
+  source_path = "${path.module}/../lambda_functions/pull_data"  # Folder containing your main.py
+
+  environment_variables = {
+    QUEUE_URL   = aws_sqs_queue.terraform_queue.id
+    S3_BUCKET_B = aws_s3_bucket.tf_bucket_2.bucket
+  }
+
+  layers = [ "arn:aws:lambda:eu-west-3:183295454956:layer:aws-data-wrangler:2"    ] 
+
+  attach_policy_json = false
+  # On utilise le rôle existant
+  lambda_role = aws_iam_role.lambda_exec.arn
+}
   
 # Scheduled Lambda 2
 resource "aws_cloudwatch_event_rule" "every_10m" {
@@ -186,13 +235,13 @@ resource "aws_cloudwatch_event_rule" "every_10m" {
 
 resource "aws_cloudwatch_event_target" "invoke_lambda2" {
   rule = aws_cloudwatch_event_rule.every_10m.name
-  arn  = aws_lambda_function.csv_to_parquet.arn
+  arn  = module.lambda_function_2.lambda_function_arn
 }
 
 resource "aws_lambda_permission" "allow_events_invoke" {
   statement_id  = "AllowExecutionFromEvents"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.csv_to_parquet.function_name
+  function_name = module.lambda_function_2.lambda_function_name
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.every_10m.arn
 }

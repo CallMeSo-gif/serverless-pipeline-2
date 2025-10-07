@@ -32,7 +32,9 @@ resource "aws_iam_policy" "glue-policy" {
           "s3:ListBucket",
           "s3:GetObject",
           "s3:PutObject",
-          "s3:DeleteObject"
+          "s3:DeleteObject",
+          "s3:GetBucketLocation",
+          "s3:CreateBucket"
         ]
         Resource = [
           "arn:aws:s3:::${var.s3_bucket1}/*",
@@ -65,6 +67,12 @@ resource "aws_iam_policy" "glue-policy" {
 resource "aws_iam_role_policy_attachment" "example-attach" {
   role       = aws_iam_role.glue-role.name
   policy_arn = aws_iam_policy.glue-policy.arn
+}
+
+# Attach the AWS managed policy for querying Athenae
+resource "aws_iam_role_policy_attachment" "example-attach2" {
+  role       = aws_iam_role.glue-role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonAthenaFullAccess"
 }
 
 
@@ -157,66 +165,80 @@ resource "aws_glue_crawler" "parquet-crawler" {
 # AWS Glue JOB 
 resource "aws_glue_job" "etl_job" {
   name              = "my-etl-job"
-  description       = "A glue ETL job to read the data fromm dthe bucket, transform it and write to another bucket"
+  description       = "A glue ETL job to read the data fromm the bucket, transform it and write to another bucket"
   role_arn          = aws_iam_role.glue-role.arn
-  
+    
   command {
-    script_location = "s3://${var.s3_bucket2}/jobs/etl-job.py"
-    name            = "pythonshell"
+    script_location = "s3://${var.s3_bucket2}/jobs/athena-spark.py"
+    name            = "glueet1"
     #glueet1 for pyspark, pythonshell for plain python and gluestreaming for streaming jobs 
     python_version  = "3"
   }
 
-  notification_property {
-    notify_delay_after = 3 # delay in minutes
-  }
-
-
-  /*
-  execution_property {
-    max_concurrent_runs = 1
-  }
-*/
   glue_version      = "5.0"
   max_retries       = 0 #no automatic retries
   timeout           = 2880 # 24hours before the job is stopped
-  
-  //number_of_workers = 2
-  //worker_type       = "G.1X"
-  max_capacity = 1
+  number_of_workers = 2
+  worker_type = "G.1X"
+ 
+  #max_capacity = 1 only for pythonshell jobs
   execution_class   = "STANDARD"
 
+  default_arguments = {
+    "--DATABASE_NAME"          = var.database_name
+    "--TABLE_NAME"             = var.table_name
+    "--OUTPUT_BUCKET"          = var.s3_bucket2
+    "--OUTPUT_PREFIX"          = "glue-processed-athena/"
+    "--job-language"     = "python"
+    "--ENV"              = "dev"
+    "--AWS_DEFAULT_REGION" = var.aws_region
+  }
 
   tags = {
     "Description" = "Activite 3 avec Glue",
-    "Workers"     = "2",
-    "Type"        = "G.1X"
+    "Owner"       = "sfeuvouka"
   }
 }
 
-# IAM Role for Glue Crawler
-resource "aws_iam_role" "athena-role" { 
-  name = var.athena_role_name
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "athena.amazonaws.com"
-        }
-      },
-    ]
-  })
+/*
+
+resource "aws_glue_trigger" "my_trigger" {
+  name     = "my-glue-trigger"
+  type     = "SCHEDULED"
+  schedule = "cron(0/5 * * * ? *)"  # Every 5 minutes
+
+  actions {
+    job_name = aws_glue_job.etl_job.name
+  }
+
+  start_on_creation = false
 }
+*/
 
-#  Sufficient permission  for Athena to read the Glue table
-resource "aws_lakeformation_permissions" "this" {
-  principal   = aws_iam_role.glue-role.arn
-  permissions = ["SELECT", "ALTER", "INSERT", "DESCRIBE"]
 
-  database {
-    name          = var.database_name
+
+
+# Workgroup for Athena
+resource "aws_athena_workgroup" "example" {
+  name = "example_workgroup"
+
+  configuration {
+    enforce_workgroup_configuration = true
+    result_configuration {
+      output_location = "s3://${var.s3_bucket2}/athena-queries/"
+      encryption_configuration {
+        encryption_option = "SSE_S3"
+      }
+    }
   }
 }
+/*
+resource "aws_athena_named_query" "foo" {
+  name      = "bar"
+  workgroup = aws_athena_workgroup.example.id
+  database  = var.database_name
+  query     = "SELECT * FROM ${var.database_name}.${var.table_name} limit 2;"
+}
+
+*/
+
