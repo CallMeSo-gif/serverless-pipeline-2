@@ -1,4 +1,4 @@
-Why tw repo ? 
+Why two repo ? 
 
 
 The first one was not configured with SSH, just using HTTPS. 
